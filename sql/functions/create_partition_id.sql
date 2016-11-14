@@ -145,6 +145,16 @@ FOREACH v_id IN ARRAY p_partition_ids LOOP
         PERFORM @extschema@.apply_foreign_keys(p_parent_table, v_parent_schema||'.'||v_partition_name, v_job_id);
     END IF;
 
+    -- Porch Audit Logging
+    PERFORM db_build.create_table(v_parent_schema, v_partition_name);
+    EXECUTE format('ALTER TABLE %I.%I INHERIT %I.%I'
+        , v_parent_schema||'_log'
+        , v_partition_name||'_log'
+        , v_parent_schema||'_log'
+        , v_parent_tablename||'_log'
+    );
+    -- End Porch Audit Logging
+
     IF v_jobmon_schema IS NOT NULL THEN
         PERFORM update_step(v_step_id, 'OK', 'Done');
     END IF;
