@@ -1,7 +1,7 @@
 Porch Customization
 ===================
 This version of Pg Partition Manager has been customized to:
-1. Support range type tstzrange (This is pending merge upstream)
+1. Support range type tstzrange (This is pending merge upstream https://github.com/keithf4/pg_partman/pull/149)
 2. Support db_builder audit logging on all partition tables
 
 [![PGXN version](https://badge.fury.io/pg/pg_partman.svg)](https://badge.fury.io/pg/pg_partman)
