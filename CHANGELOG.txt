@@ -1,3 +1,6 @@
+2.6.2.2-porch
+-- Merge upstream 2.6.2 final into porch version which included updates to the python scripts. No SQL changes.
+
 2.6.2.1-porch
 -- Porch customization to add audit logging
 
