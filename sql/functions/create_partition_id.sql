@@ -12,6 +12,7 @@ ex_hint                 text;
 ex_message              text;
 v_all                   text[] := ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'];
 v_analyze               boolean := FALSE;
+v_audit_log             boolean;
 v_control               text;
 v_exists                text;
 v_grantees              text[];
@@ -45,10 +46,12 @@ SELECT control
     , partition_interval
     , inherit_fk
     , jobmon
+    , audit_log
 INTO v_control
     , v_partition_interval
     , v_inherit_fk
     , v_jobmon
+    , v_audit_log
 FROM @extschema@.part_config
 WHERE parent_table = p_parent_table
 AND partition_type = 'id';
@@ -69,9 +72,9 @@ EXECUTE format('SELECT set_config(%L, %L, %L)', 'search_path', v_new_search_path
 -- Determine if this table is a child of a subpartition parent. If so, get limits of what child tables can be created based on parent suffix
 SELECT sub_min::bigint, sub_max::bigint INTO v_sub_id_min, v_sub_id_max FROM @extschema@.check_subpartition_limits(p_parent_table, 'id');
 
-SELECT tableowner, schemaname, tablename, tablespace 
-INTO v_parent_owner, v_parent_schema, v_parent_tablename, v_parent_tablespace 
-FROM pg_catalog.pg_tables 
+SELECT tableowner, schemaname, tablename, tablespace
+INTO v_parent_owner, v_parent_schema, v_parent_tablename, v_parent_tablespace
+FROM pg_catalog.pg_tables
 WHERE schemaname = split_part(p_parent_table, '.', 1)::name
 AND tablename = split_part(p_parent_table, '.', 2)::name;
 
@@ -80,7 +83,7 @@ IF v_jobmon_schema IS NOT NULL THEN
 END IF;
 
 FOREACH v_id IN ARRAY p_partition_ids LOOP
--- Do not create the child table if it's outside the bounds of the top parent. 
+-- Do not create the child table if it's outside the bounds of the top parent.
     IF v_sub_id_min IS NOT NULL THEN
         IF v_id < v_sub_id_min OR v_id > v_sub_id_max THEN
             CONTINUE;
@@ -101,7 +104,7 @@ FOREACH v_id IN ARRAY p_partition_ids LOOP
         v_step_id := add_step(v_job_id, 'Creating new partition '||v_partition_name||' with interval from '||v_id||' to '||(v_id + v_partition_interval)-1);
     END IF;
 
-    SELECT relpersistence INTO v_unlogged 
+    SELECT relpersistence INTO v_unlogged
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
     WHERE c.relname = v_parent_tablename::name
@@ -115,7 +118,7 @@ FOREACH v_id IN ARRAY p_partition_ids LOOP
             , v_partition_name
             , v_parent_schema
             , v_parent_tablename);
-    SELECT relhasoids INTO v_hasoids 
+    SELECT relhasoids INTO v_hasoids
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
     WHERE c.relname = v_parent_tablename::name
@@ -146,13 +149,15 @@ FOREACH v_id IN ARRAY p_partition_ids LOOP
     END IF;
 
     -- Porch Audit Logging
-    PERFORM db_build.create_table(v_parent_schema, v_partition_name);
-    EXECUTE format('ALTER TABLE %I.%I INHERIT %I.%I'
-        , v_parent_schema||'_log'
-        , v_partition_name||'_log'
-        , v_parent_schema||'_log'
-        , v_parent_tablename||'_log'
-    );
+    PERFORM db_build.create_table(v_parent_schema, v_partition_name, v_audit_log);
+    IF v_audit_log THEN
+        EXECUTE format('ALTER TABLE %I.%I INHERIT %I.%I'
+            , v_parent_schema||'_log'
+            , v_partition_name||'_log'
+            , v_parent_schema||'_log'
+            , v_parent_tablename||'_log'
+        );
+    END IF;
     -- End Porch Audit Logging
 
     IF v_jobmon_schema IS NOT NULL THEN
@@ -161,7 +166,7 @@ FOREACH v_id IN ARRAY p_partition_ids LOOP
 
     -- Will only loop once and only if sub_partitioning is actually configured
     -- This seemed easier than assigning a bunch of variables then doing an IF condition
-    FOR v_row IN 
+    FOR v_row IN
         SELECT sub_parent
             , sub_partition_type
             , sub_control
@@ -209,7 +214,7 @@ FOREACH v_id IN ARRAY p_partition_ids LOOP
             , v_row.sub_jobmon);
         EXECUTE v_sql;
 
-        UPDATE @extschema@.part_config SET 
+        UPDATE @extschema@.part_config SET
             retention_schema = v_row.sub_retention_schema
             , retention_keep_table = v_row.sub_retention_keep_table
             , retention_keep_index = v_row.sub_retention_keep_index
@@ -224,7 +229,7 @@ FOREACH v_id IN ARRAY p_partition_ids LOOP
         END IF;
 
     END LOOP; -- end sub partitioning LOOP
-    
+
     -- Manage additonal constraints if set
     PERFORM @extschema@.apply_constraints(p_parent_table, p_job_id := v_job_id, p_debug := p_debug);
 
@@ -254,7 +259,7 @@ IF v_jobmon_schema IS NOT NULL THEN
 
     PERFORM close_job(v_job_id);
 END IF;
- 
+
 EXECUTE format('SELECT set_config(%L, %L, %L)', 'search_path', v_old_search_path, 'false');
 
 RETURN v_partition_created;

@@ -22,6 +22,7 @@ CREATE TABLE part_config (
     , trigger_exception_handling BOOLEAN DEFAULT false
     , upsert text NOT NULL DEFAULT ''
     , trigger_return_null boolean NOT NULL DEFAULT true
+    , audit_log boolean NOT NULL DEFAULT false
     , CONSTRAINT part_config_parent_table_pkey PRIMARY KEY (parent_table)
     , CONSTRAINT positive_premake_check CHECK (premake > 0)
 );
@@ -31,7 +32,7 @@ SELECT pg_catalog.pg_extension_config_dump('part_config', '');
 
 -- FK set deferrable because create_parent() inserts to this table before part_config
 CREATE TABLE part_config_sub (
-    sub_parent text 
+    sub_parent text
     , sub_partition_type text NOT NULL
     , sub_control text NOT NULL
     , sub_partition_interval text NOT NULL
@@ -82,20 +83,20 @@ END
 $$;
 
 ALTER TABLE @extschema@.part_config
-ADD CONSTRAINT part_config_type_check 
+ADD CONSTRAINT part_config_type_check
 CHECK (@extschema@.check_partition_type(partition_type));
 
 ALTER TABLE @extschema@.part_config_sub
 ADD CONSTRAINT part_config_sub_type_check
 CHECK (@extschema@.check_partition_type(sub_partition_type));
 
--- Ensure the control column cannot be one of the additional constraint columns. 
+-- Ensure the control column cannot be one of the additional constraint columns.
 ALTER TABLE @extschema@.part_config ADD CONSTRAINT control_constraint_col_chk CHECK ((constraint_cols @> ARRAY[control]) <> true);
 ALTER TABLE @extschema@.part_config_sub ADD CONSTRAINT control_constraint_col_chk CHECK ((sub_constraint_cols @> ARRAY[sub_control]) <> true);
 
 
 /*
- * Custom view to help improve privilege lookups for pg_partman. 
+ * Custom view to help improve privilege lookups for pg_partman.
  * information_schema is a performance bottleneck since indexes aren't being used properly.
  */
 CREATE VIEW @extschema@.table_privs AS

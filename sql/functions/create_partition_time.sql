@@ -1,7 +1,7 @@
 /*
  * Function to create a child table in a time-based partition set
  */
-CREATE FUNCTION create_partition_time(p_parent_table text, p_partition_times timestamptz[], p_analyze boolean DEFAULT true, p_debug boolean DEFAULT false) 
+CREATE FUNCTION create_partition_time(p_parent_table text, p_partition_times timestamptz[], p_analyze boolean DEFAULT true, p_debug boolean DEFAULT false)
 RETURNS boolean
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
@@ -13,6 +13,7 @@ ex_hint                         text;
 ex_message                      text;
 v_all                           text[] := ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'];
 v_analyze                       boolean := FALSE;
+v_audit_log                     boolean;
 v_control                       text;
 v_datetime_string               text;
 v_exists                        text;
@@ -61,6 +62,7 @@ SELECT partition_type
     , inherit_fk
     , jobmon
     , datetime_string
+    , audit_log
 INTO v_type
     , v_control
     , v_partition_interval
@@ -68,6 +70,7 @@ INTO v_type
     , v_inherit_fk
     , v_jobmon
     , v_datetime_string
+    , v_audit_log
 FROM @extschema@.part_config
 WHERE parent_table = p_parent_table
 AND (partition_type = 'time' OR partition_type = 'time-custom');
@@ -88,9 +91,9 @@ EXECUTE format('SELECT set_config(%L, %L, %L)', 'search_path', v_new_search_path
 -- Determine if this table is a child of a subpartition parent. If so, get limits of what child tables can be created based on parent suffix
 SELECT sub_min::timestamptz, sub_max::timestamptz INTO v_sub_timestamp_min, v_sub_timestamp_max FROM @extschema@.check_subpartition_limits(p_parent_table, 'time');
 
-SELECT tableowner, schemaname, tablename, tablespace 
-INTO v_parent_owner, v_parent_schema, v_parent_tablename, v_parent_tablespace 
-FROM pg_catalog.pg_tables 
+SELECT tableowner, schemaname, tablename, tablespace
+INTO v_parent_owner, v_parent_schema, v_parent_tablename, v_parent_tablespace
+FROM pg_catalog.pg_tables
 WHERE schemaname = split_part(p_parent_table, '.', 1)::name
 AND tablename = split_part(p_parent_table, '.', 2)::name;
 
@@ -118,19 +121,19 @@ IF p_debug THEN
     RAISE NOTICE 'create_partition_time: v_partition_expression: %', v_partition_expression;
 END IF;
 
-FOREACH v_time IN ARRAY p_partition_times LOOP    
+FOREACH v_time IN ARRAY p_partition_times LOOP
     v_partition_timestamp_start := v_time;
     BEGIN
         v_partition_timestamp_end := v_time + v_partition_interval;
     EXCEPTION WHEN datetime_field_overflow THEN
-        RAISE WARNING 'Attempted partition time interval is outside PostgreSQL''s supported time range. 
+        RAISE WARNING 'Attempted partition time interval is outside PostgreSQL''s supported time range.
             Child partition creation after time % skipped', v_time;
         v_step_overflow_id := add_step(v_job_id, 'Attempted partition time interval is outside PostgreSQL''s supported time range.');
         PERFORM update_step(v_step_overflow_id, 'CRITICAL', 'Child partition creation after time '||v_time||' skipped');
         CONTINUE;
     END;
 
-    -- Do not create the child table if it's outside the bounds of the top parent. 
+    -- Do not create the child table if it's outside the bounds of the top parent.
     IF v_sub_timestamp_min IS NOT NULL THEN
         IF v_time < v_sub_timestamp_min OR v_time > v_sub_timestamp_max THEN
             CONTINUE;
@@ -156,7 +159,7 @@ FOREACH v_time IN ARRAY p_partition_times LOOP
                                                 , v_partition_timestamp_end-'1sec'::interval));
     END IF;
 
-    SELECT relpersistence INTO v_unlogged 
+    SELECT relpersistence INTO v_unlogged
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
     WHERE c.relname = v_parent_tablename::name
@@ -170,7 +173,7 @@ FOREACH v_time IN ARRAY p_partition_times LOOP
                                 , v_partition_name
                                 , v_parent_schema
                                 , v_parent_tablename);
-    SELECT relhasoids INTO v_hasoids 
+    SELECT relhasoids INTO v_hasoids
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
     WHERE c.relname = v_parent_tablename::name
@@ -219,15 +222,17 @@ FOREACH v_time IN ARRAY p_partition_times LOOP
     IF v_inherit_fk THEN
         PERFORM @extschema@.apply_foreign_keys(p_parent_table, v_parent_schema||'.'||v_partition_name, v_job_id);
     END IF;
-    
+
     -- Porch Audit Logging
-    PERFORM db_build.create_table(v_parent_schema, v_partition_name);
-    EXECUTE format('ALTER TABLE %I.%I INHERIT %I.%I'
-        , v_parent_schema||'_log'
-        , v_partition_name||'_log'
-        , v_parent_schema||'_log'
-        , v_parent_tablename||'_log'
-    );
+    PERFORM db_build.create_table(v_parent_schema, v_partition_name, v_audit_log);
+    IF v_audit_log THEN
+        EXECUTE format('ALTER TABLE %I.%I INHERIT %I.%I'
+            , v_parent_schema||'_log'
+            , v_partition_name||'_log'
+            , v_parent_schema||'_log'
+            , v_parent_tablename||'_log'
+        );
+    END IF;
     -- End Porch Audit Logging
 
     IF v_jobmon_schema IS NOT NULL THEN
@@ -236,7 +241,7 @@ FOREACH v_time IN ARRAY p_partition_times LOOP
 
     -- Will only loop once and only if sub_partitioning is actually configured
     -- This seemed easier than assigning a bunch of variables then doing an IF condition
-    FOR v_row IN 
+    FOR v_row IN
         SELECT sub_parent
             , sub_partition_type
             , sub_control
@@ -284,7 +289,7 @@ FOREACH v_time IN ARRAY p_partition_times LOOP
             , v_row.sub_jobmon);
         EXECUTE v_sql;
 
-        UPDATE @extschema@.part_config SET 
+        UPDATE @extschema@.part_config SET
             retention_schema = v_row.sub_retention_schema
             , retention_keep_table = v_row.sub_retention_keep_table
             , retention_keep_index = v_row.sub_retention_keep_index
