@@ -15,7 +15,7 @@ v_count                         int;
 v_current_partition_name        text;
 v_current_partition_timestamp   timestamptz;
 v_datetime_string               text;
-v_epoch                         boolean;
+v_epoch                         text;
 v_final_partition_timestamp     timestamptz;
 v_function_name                 text;
 v_job_id                        bigint;
@@ -107,11 +107,12 @@ AND table_name = v_parent_tablename
 AND column_name = v_control
 ;
 
-v_partition_expression := case
-    when v_epoch = true then format('to_timestamp(NEW.%I)', v_control)
-    when v_ranged_control = true then format('lower(NEW.%I)', v_control)
-    else format('NEW.%I', v_control)
-end;
+v_partition_expression := CASE
+    WHEN v_epoch = 'seconds' THEN format('to_timestamp(NEW.%I)', v_control)
+    WHEN v_epoch = 'milliseconds' THEN format('to_timestamp((NEW.%I/1000)::float)', v_control)
+    WHEN v_ranged_control = true then format('lower(NEW.%I)', v_control)
+    ELSE format('NEW.%I', v_control)
+END;
 
 IF v_type = 'time' THEN
     v_trig_func := format('CREATE OR REPLACE FUNCTION %I.%I() RETURNS trigger LANGUAGE plpgsql AS $t$
@@ -343,5 +344,3 @@ DETAIL: %
 HINT: %', ex_message, ex_context, ex_detail, ex_hint;
 END
 $$;
-
-

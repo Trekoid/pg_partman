@@ -1,7 +1,7 @@
 {
     "name": "pg_partman",
     "abstract": "Extension to manage partitioned tables by time or ID",
-    "version": "2.6.2.2-porch",
+    "version": "2.6.2.3-porch",
     "maintainer": [ 
         "Keith Fiske <keith@omniti.com>"
     ],
@@ -20,9 +20,9 @@
     },
     "provides": {
         "pg_partman": {
-            "file": "sql/pg_partman--2.6.2.2-porch.sql",
+            "file": "sql/pg_partman--2.6.2.3-porch.sql",
             "docfile": "doc/pg_partman.md",
-            "version": "2.6.2.2-porch.sql",
+            "version": "2.6.3.1-porch.sql",
             "abstract": "Porch customized extension to manage partitioned tables by time or ID"
         }
     },
