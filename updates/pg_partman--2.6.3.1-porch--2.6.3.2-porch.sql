@@ -1,3 +1,5 @@
+-- Make Porch audit logging configurable by partition set
+
 ALTER TABLE @extschema@.part_config
     ADD COLUMN audit_log BOOLEAN NOT NULL DEFAULT FALSE;
 
