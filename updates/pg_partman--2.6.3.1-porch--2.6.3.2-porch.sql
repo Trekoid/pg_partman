@@ -1,9 +1,17 @@
 -- Make Porch audit logging configurable by partition set
 
+CREATE TEMP TABLE partman_preserve_privs_temp (statement text);
+
+INSERT INTO partman_preserve_privs_temp
+SELECT 'GRANT EXECUTE ON FUNCTION @extschema@.create_parent(text, text, text, text, text[], integer, boolean, text, boolean, text, text, boolean, boolean, boolean, boolean)  TO '||array_to_string(array_agg(grantee::text), ',')||';'
+FROM information_schema.routine_privileges
+WHERE routine_schema = '@extschema@'
+AND routine_name = 'create_parent';
+
+DROP FUNCTION @extschema@.create_parent(text, text, text, text, text[], integer, boolean, text, boolean, text, text, boolean, boolean, boolean);;
+
 ALTER TABLE @extschema@.part_config
     ADD COLUMN audit_log BOOLEAN NOT NULL DEFAULT FALSE;
-
-DROP FUNCTION @extschema@.create_parent(text, text, text, text, text[], integer, boolean, text, boolean, boolean, text, boolean, boolean, boolean);
 
 /*
  * Function to turn a table into the parent of a partition set
@@ -18,7 +26,7 @@ CREATE FUNCTION @extschema@.create_parent(
     , p_use_run_maintenance boolean DEFAULT NULL
     , p_start_partition text DEFAULT NULL
     , p_inherit_fk boolean DEFAULT true
-    , p_epoch boolean DEFAULT false
+    , p_epoch text DEFAULT 'none' 
     , p_upsert text DEFAULT ''
     , p_trigger_return_null boolean DEFAULT true
     , p_jobmon boolean DEFAULT true
@@ -96,7 +104,7 @@ AND a.attname = p_control::name;
         RAISE EXCEPTION 'Control column given (%) for parent table (%) does not exist or must be set to NOT NULL', p_control, p_parent_table;
     END IF;
 
-IF p_type = 'id' AND p_epoch = true THEN
+IF p_type = 'id' AND p_epoch <> 'none' THEN
     RAISE EXCEPTION 'p_epoch can only be used with time-based partitioning';
 END IF;
 
@@ -562,7 +570,6 @@ DETAIL: %
 HINT: %', ex_message, ex_context, ex_detail, ex_hint;
 END
 $$;
-
 
 /*
  * Function to create id partitions
@@ -1217,3 +1224,18 @@ DETAIL: %
 HINT: %', ex_message, ex_context, ex_detail, ex_hint;
 END
 $$;
+
+-- Restore dropped object privileges
+DO $$
+DECLARE
+v_row   record;
+BEGIN
+    FOR v_row IN SELECT statement FROM partman_preserve_privs_temp LOOP
+        IF v_row.statement IS NOT NULL THEN
+            EXECUTE v_row.statement;
+        END IF;
+    END LOOP;
+END
+$$;
+
+DROP TABLE IF EXISTS partman_preserve_privs_temp;
