@@ -2,7 +2,7 @@
 -- Make Porch audit logging configurable by partition set
 
 2.6.3.1-porch
--- Merge upstream 2.6.3 into porch version. No SQL changes
+-- Merge upstream 2.6.3 into porch version.
 
 2.6.3
 -- IMPORTANT NOTE: Installing the new C library requires a restart of the database cluster. Even if you are not running 9.6, it is recommended to restart after this update to ensure the latest library file is loaded into the database if you have compiled the C library.
