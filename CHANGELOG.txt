@@ -1,3 +1,6 @@
+2.6.3.2-porch
+-- Make Porch audit logging configurable by partition set
+
 2.6.3.1-porch
 -- Merge upstream 2.6.3 into porch version.
 

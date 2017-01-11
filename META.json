@@ -1,9 +1,9 @@
 {
     "name": "pg_partman",
     "abstract": "Extension to manage partitioned tables by time or ID",
-    "version": "2.6.3.1-porch",
+    "version": "2.6.3.2-porch",
     "maintainer": [ 
-        "Keith Fiske <keith@omniti.com>"
+        "Michael Rasmussen <michaelr@porch.com>"
     ],
     "license": "postgresql",
     "generated_by": "Keith Fiske",
@@ -20,19 +20,19 @@
     },
     "provides": {
         "pg_partman": {
-            "file": "sql/pg_partman--2.6.3.1-porch.sql",
+            "file": "sql/pg_partman--2.6.3.2-porch.sql",
             "docfile": "doc/pg_partman.md",
-            "version": "2.6.3.1-porch",
+            "version": "2.6.3.2-porch",
             "abstract": "Porch customized extension to manage partitioned tables by time or ID"
         }
     },
     "resources": {
         "bugtracker": {
-            "web": "https://github.com/keithf4/pg_partman/issues"
+            "web": "https://porchdotcom.atlassian.net/projects/DATA/issues"
         },
         "repository": {
-            "url": "git://github.com/keithf4/pg_partman.git" ,
-            "web": "https://github.com/keithf4/pg_partman",
+            "url": "git@gitlab.porch.com:porch-forks/pg_partman.git" ,
+            "web": "https://gitlab.porch.com/porch-forks/pg_partman",
             "type": "git"
         }
     },    
