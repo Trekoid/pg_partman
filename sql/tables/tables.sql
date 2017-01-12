@@ -52,6 +52,7 @@ CREATE TABLE part_config_sub (
     , sub_trigger_exception_handling BOOLEAN DEFAULT false
     , sub_upsert TEXT NOT NULL DEFAULT ''
     , sub_trigger_return_null boolean NOT NULL DEFAULT true
+    , sub_audit_log boolean NOT NULL DEFAULT false
     , CONSTRAINT part_config_sub_pkey PRIMARY KEY (sub_parent)
     , CONSTRAINT part_config_sub_sub_parent_fkey FOREIGN KEY (sub_parent) REFERENCES @extschema@.part_config (parent_table) ON DELETE CASCADE ON UPDATE CASCADE DEFERRABLE INITIALLY DEFERRED
     , CONSTRAINT positive_premake_check CHECK (sub_premake > 0)

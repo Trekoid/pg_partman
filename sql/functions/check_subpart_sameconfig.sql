@@ -23,7 +23,8 @@ CREATE OR REPLACE FUNCTION @extschema@.check_subpart_sameconfig(p_parent_table t
         , sub_jobmon boolean
         , sub_trigger_exception_handling boolean
         , sub_upsert text
-        , sub_trigger_return_null boolean)
+        , sub_trigger_return_null boolean
+        , sub_audit_log boolean)
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path = @extschema@,pg_temp
 AS $$
@@ -62,8 +63,7 @@ AS $$
         , a.sub_trigger_exception_handling
         , a.sub_upsert
         , a.sub_trigger_return_null
+        , a.sub_audit_log
     FROM @extschema@.part_config_sub a
     JOIN child_tables b on a.sub_parent = b.tablename;
 $$;
-
-

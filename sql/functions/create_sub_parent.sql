@@ -19,7 +19,8 @@ CREATE FUNCTION create_sub_parent(
     , p_upsert text DEFAULT ''
     , p_trigger_return_null boolean DEFAULT true
     , p_jobmon boolean DEFAULT true
-    , p_debug boolean DEFAULT false) 
+    , p_debug boolean DEFAULT false
+    , p_audit_log boolean DEFAULT false)
 RETURNS boolean
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
@@ -97,7 +98,8 @@ LOOP
             , p_upsert := %L
             , p_trigger_return_null := %L
             , p_jobmon := %L
-            , p_debug := %L )'
+            , p_debug := %L
+            , p_audit_log := %L )'
         , v_row.child_table
         , p_control
         , p_type
@@ -111,7 +113,8 @@ LOOP
         , p_upsert
         , p_trigger_return_null
         , p_jobmon
-        , p_debug);
+        , p_debug
+        , p_audit_log);
     EXECUTE v_sql;
 
 END LOOP;
@@ -128,7 +131,8 @@ INSERT INTO @extschema@.part_config_sub (
     , sub_epoch
     , sub_upsert
     , sub_jobmon
-    , sub_trigger_return_null)
+    , sub_trigger_return_null
+    , sub_audit_log)
 VALUES (
     p_top_parent
     , p_control
@@ -141,7 +145,8 @@ VALUES (
     , p_epoch
     , p_upsert
     , p_jobmon
-    , p_trigger_return_null);
+    , p_trigger_return_null
+    , p_audit_log);
 
 v_success := true;
 
@@ -151,4 +156,3 @@ RETURN v_success;
 
 END
 $$;
-
